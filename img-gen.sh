@@ -4,7 +4,6 @@ set -e
 
 # Clean cached Files
 sudo git clean -fdx
-sudo git pull
 
 . scripts/func.sh
 
@@ -14,9 +13,12 @@ getAddons "files/p3/addons"
 getModules "files/p3/modules"
 getConfigs "files/p3/configs"
 getPatches "files/p3/patches"
+getCustom "files/p3/custom"
 getTheme "files/p1/boot/grub"
 getOffline "files/p3/configs"
+getBuildroots "latest" "brs"
 
+# Sbase
 IMAGE_FILE="arc.img"
 gzip -dc "files/initrd/opt/arc/grub.img.gz" >"${IMAGE_FILE}"
 fdisk -l "${IMAGE_FILE}"
@@ -32,22 +34,16 @@ mkdir -p "/tmp/p3"
 sudo mount ${LOOPX}p1 "/tmp/p1"
 sudo mount ${LOOPX}p3 "/tmp/p3"
 
-echo "Get Buildroot"
-# read -rp 'Version (2023.08.x): ' br_version
-[ -z "${br_version}" ] && br_version="2023.08.x"
-getBuildroot "${br_version}" "br"
-[[ ! -f "br/bzImage-arc" || ! -f "br/initrd-arc" ]] && return 1
+[[ ! -f "brs/bzImage-arc" || ! -f "brs/initrd-arc" ]] && return 1
 
 VERSION=$(date +'%y.%-m.dev')
 echo "${VERSION}" >files/p1/ARC-VERSION
 echo "${VERSION}" >VERSION
 sed 's/^ARC_VERSION=.*/ARC_VERSION="'${VERSION}'"/' -i files/initrd/opt/arc/include/consts.sh
 
-# read -rp "Build: ${VERSION}? Press ENTER to continue"
-
 echo "Repack initrd"
-cp -f "br/bzImage-arc" "files/p3/bzImage-arc"
-repackInitrd "br/initrd-arc" "files/initrd" "files/p3/initrd-arc"
+cp -f "brs/bzImage-arc" "files/p3/bzImage-arc"
+repackInitrd "brs/initrd-arc" "files/initrd" "files/p3/initrd-arc"
 
 echo "Copying files"
 sudo cp -Rf "files/p1/"* "/tmp/p1"
@@ -62,5 +58,6 @@ rmdir "/tmp/p3"
 
 sudo losetup --detach ${LOOPX}
 
-qemu-img convert -O vmdk arc.img arc-dyn.vmdk
-qemu-img convert -O vmdk -o adapter_type=lsilogic arc.img -o subformat=monolithicFlat arc.vmdk
+qemu-img convert ${IMAGE_FILE} -O vmdk -o adapter_type=lsilogic arc-dyn.vmdk
+qemu-img convert ${IMAGE_FILE} -O vmdk -o adapter_type=lsilogic,subformat=monolithicFlat arc.vmdk
+qemu-img convert ${IMAGE_FILE} -O vhdx -o subformat=dynamic arc.vhdx

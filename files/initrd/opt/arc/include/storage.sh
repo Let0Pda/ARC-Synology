@@ -8,7 +8,7 @@ function getmap() {
   [ -f "${TMP_PATH}/drivescon" ] && rm -f "${TMP_PATH}/drivescon"
   touch "${TMP_PATH}/drivescon"
   [ -f "${TMP_PATH}/ports" ] && rm -f "${TMP_PATH}/ports"
-  touch "${TMP_PATH}ports"
+  touch "${TMP_PATH}/ports"
   [ -f "${TMP_PATH}/remap" ] && rm -f "${TMP_PATH}/remap"
   touch "${TMP_PATH}/remap"
   if [ $(lspci -d ::106 | wc -l) -gt 0 ]; then
@@ -50,7 +50,7 @@ function getmap() {
   if [ $(lspci -d ::107 | wc -l) -gt 0 ]; then
     for PCI in $(lspci -d ::107 | awk '{print $1}'); do
       NAME=$(lspci -s "${PCI}" | sed "s/\ .*://")
-      PORT=$(ls -l /sys/class/scsi_host | grep "${PCI}" | awk -F'/' '{print $NF}' | sed 's/host//' | sort -n)
+      PORT=$(ls -l /sys/class/scsi_host | grep "${PCI}" | awk -F'/' '{print $NF}' | sed 's/host//' | sort -n 2>/dev/null)
       PORTNUM=$(lsscsi -b | grep -v - | grep "\[${PORT}:" | wc -l)
       SASDRIVES=$((${SASDRIVES} + ${PORTNUM}))
     done
@@ -60,7 +60,7 @@ function getmap() {
   if [ $(lspci -d ::100 | wc -l) -gt 0 ]; then
     for PCI in $(lspci -d ::100 | awk '{print $1}'); do
       NAME=$(lspci -s "${PCI}" | sed "s/\ .*://")
-      PORT=$(ls -l /sys/class/scsi_host | grep "${PCI}" | awk -F'/' '{print $NF}' | sed 's/host//' | sort -n)
+      PORT=$(ls -l /sys/class/scsi_host | grep "${PCI}" | awk -F'/' '{print $NF}' | sed 's/host//' | sort - 2>/dev/null)
       PORTNUM=$(lsscsi -b | grep -v - | grep "\[${PORT}:" | wc -l)
       SCSIDRIVES=$((${SCSIDRIVES} + ${PORTNUM}))
     done
@@ -70,7 +70,7 @@ function getmap() {
   if [ $(lspci -d ::104 | wc -l) -gt 0 ]; then
     for PCI in $(lspci -d ::104 | awk '{print $1}'); do
       NAME=$(lspci -s "${PCI}" | sed "s/\ .*://")
-      PORT=$(ls -l /sys/class/scsi_host | grep "${PCI}" | awk -F'/' '{print $NF}' | sed 's/host//' | sort -n)
+      PORT=$(ls -l /sys/class/scsi_host | grep "${PCI}" | awk -F'/' '{print $NF}' | sed 's/host//' | sort -n 2>/dev/null)
       PORTNUM=$(lsscsi -b | grep -v - | grep "\[${PORT}:" | wc -l)
       RAIDDRIVES=$((${RAIDDRIVES} + ${PORTNUM}))
     done
@@ -80,7 +80,7 @@ function getmap() {
   if [[ -d "/sys/class/scsi_host" && $(ls -l /sys/class/scsi_host | grep usb | wc -l) -gt 0 ]]; then
     for PCI in $(lspci -d ::c03 | awk '{print $1}'); do
       NAME=$(lspci -s "${PCI}" | sed "s/\ .*://")
-      PORT=$(ls -l /sys/class/scsi_host | grep "${PCI}" | awk -F'/' '{print $NF}' | sed 's/host//' | sort -n)
+      PORT=$(ls -l /sys/class/scsi_host | grep "${PCI}" | awk -F'/' '{print $NF}' | sed 's/host//' | sort -n 2>/dev/null)
       PORTNUM=$(lsscsi -b | grep -v - | grep "\[${PORT}:" | wc -l)
       [ ${PORTNUM} -eq 0 ] && continue
       USBDRIVES=$((${USBDRIVES} + ${PORTNUM}))
@@ -91,7 +91,7 @@ function getmap() {
   if [[ -d "/sys/class/mmc_host" && $(ls -l /sys/class/mmc_host | grep mmc_host | wc -l) -gt 0 ]]; then
     for PCI in $(lspci -d ::805 | awk '{print $1}'); do
       NAME=$(lspci -s "${PCI}" | sed "s/\ .*://")
-      PORTNUM=$(ls -l /sys/block/mmc* | grep "${PCI}" | wc -l)
+      PORTNUM=$(ls -l /sys/block/mmc* | grep "${PCI}" | wc -l 2>/dev/null)
       [ ${PORTNUM} -eq 0 ] && continue
       MMCDRIVES=$((${MMCDRIVES} + ${PORTNUM}))
     done
@@ -101,7 +101,7 @@ function getmap() {
   if [ $(lspci -d ::108 | wc -l) -gt 0 ]; then
     for PCI in $(lspci -d ::108 | awk '{print $1}'); do
       NAME=$(lspci -s "${PCI}" | sed "s/\ .*://")
-      PORT=$(ls -l /sys/class/nvme | grep "${PCI}" | awk -F'/' '{print $NF}' | sed 's/nvme//' | sort -n)
+      PORT=$(ls -l /sys/class/nvme | grep "${PCI}" | awk -F'/' '{print $NF}' | sed 's/nvme//' | sort -n 2>/dev/null)
       PORTNUM=$(lsscsi -b | grep -v - | grep "\[N:${PORT}:" | wc -l)
       NVMEDRIVES=$((${NVMEDRIVES} + ${PORTNUM}))
     done
@@ -122,13 +122,13 @@ function getmap() {
   if [ $(lspci -d ::106 | wc -l) -gt 0 ]; then
     LASTDRIVE=0
     while read -r D; do
-      if [ "${BUS}" = "sata" ] && [ ! "${MACHINE}" = "NATIVE" ] && [ ${D} -eq 0 ]; then
+      if [ "${BUS}" == "sata" ] && [ "${MACHINE}" != "Native" ] && [ ${D} -eq 0 ]; then
         MAXDISKS=${DRIVES}
         echo -n "${D}>${MAXDISKS}:">>"${TMP_PATH}/remap"
-      elif [ ! ${D} = ${LASTDRIVE} ]; then
+      elif [ ${D} != ${LASTDRIVE} ]; then
         echo -n "${D}>${LASTDRIVE}:">>"${TMP_PATH}/remap"
         LASTDRIVE=$((${LASTDRIVE} + 1))
-      elif [ ${D} = ${LASTDRIVE} ]; then
+      elif [ ${D} == ${LASTDRIVE} ]; then
         LASTDRIVE=$((${D} + 1))
       fi
     done < <(cat "${TMP_PATH}/ports")
@@ -141,24 +141,24 @@ function getmapSelection() {
   SATAPORTMAP="$(awk '{print $1}' "${TMP_PATH}/drivescon")"
   SATAREMAP="$(awk '{print $1}' "${TMP_PATH}/remap" | sed 's/.$//')"
   EXTERNALCONTROLLER="$(readConfigKey "device.externalcontroller" "${USER_CONFIG_FILE}")"
-  CUSTOM="$(readConfigKey "arc.custom" "${USER_CONFIG_FILE}")"
-  if [ "${CUSTOM}" = "false" ]; then
+  AUTOMATED="$(readConfigKey "automated" "${USER_CONFIG_FILE}")"
+  if [ "${AUTOMATED}" == "false" ]; then
     # Show recommended Option to user
-    if [[ -n "${SATAREMAP}" && "${EXTERNALCONTROLLER}" = "true" && "${MACHINE}" = "NATIVE" ]]; then
+    if [ -n "${SATAREMAP}" ] && [ "${EXTERNALCONTROLLER}" == "true" ] && [ "${MACHINE}" == "Native" ]; then
       REMAP2="*"
-    elif [[ -n "${SATAREMAP}" && "${EXTERNALCONTROLLER}" = "false" ]]; then
+    elif [ -n "${SATAREMAP}" ] && [ "${EXTERNALCONTROLLER}" == "false" ]; then
       REMAP3="*"
     else
       REMAP1="*"
     fi
     # Ask for Portmap
-    dialog --backtitle "$(backtitle)" --title "Arc Disks" \
-      --menu "SataPortMap or SataRemap?\n* Recommended Option" 8 60 0 \
+    dialog --backtitle "$(backtitle)" --title "Sata Portmap" \
+      --menu "Choose a Portmap for Sata!?\n* Recommended Option" 8 60 0 \
       1 "DiskIdxMap: Active Ports ${REMAP1}" \
       2 "DiskIdxMap: Max Ports ${REMAP2}" \
-      3 "SataRemap: Remove blank Ports ${REMAP3}" \
-      4 "AhciRemap: Remove blank Ports (new) ${REMAP4}" \
-      5 "I want to set my own Portmap" \
+      3 "SataRemap: Remove empty Ports ${REMAP3}" \
+      4 "AhciRemap: Remove empty Ports (new) ${REMAP4}" \
+      5 "Set my own Portmap in Config" \
     2>"${TMP_PATH}/resp"
     [ $? -ne 0 ] && return 1
     resp=$(cat "${TMP_PATH}/resp")
@@ -176,9 +176,9 @@ function getmapSelection() {
     fi
   else
     # Show recommended Option to user
-    if [[ -n "${SATAREMAP}" && "${EXTERNALCONTROLLER}" = "true" && "${MACHINE}" = "NATIVE" ]]; then
+    if [ -n "${SATAREMAP}" ] && [ "${EXTERNALCONTROLLER}" == "true" ] && [ "${MACHINE}" == "Native" ]; then
       writeConfigKey "arc.remap" "maxports" "${USER_CONFIG_FILE}"
-    elif [[ -n "${SATAREMAP}" && "${EXTERNALCONTROLLER}" = "false" ]]; then
+    elif [ -n "${SATAREMAP}" ] && [ "${EXTERNALCONTROLLER}" == "false" ]; then
       writeConfigKey "arc.remap" "remap" "${USER_CONFIG_FILE}"
     else
       writeConfigKey "arc.remap" "acports" "${USER_CONFIG_FILE}"
@@ -187,27 +187,27 @@ function getmapSelection() {
   # Check Remap for correct config
   REMAP="$(readConfigKey "arc.remap" "${USER_CONFIG_FILE}")"
   # Write Map to config and show Map to User
-  if [ "${REMAP}" = "acports" ]; then
+  if [ "${REMAP}" == "acports" ]; then
     writeConfigKey "cmdline.SataPortMap" "${SATAPORTMAP}" "${USER_CONFIG_FILE}"
     writeConfigKey "cmdline.DiskIdxMap" "${DISKIDXMAP}" "${USER_CONFIG_FILE}"
     deleteConfigKey "cmdline.sata_remap" "${USER_CONFIG_FILE}"
     deleteConfigKey "cmdline.ahci_remap" "${USER_CONFIG_FILE}"
-  elif [ "${REMAP}" = "maxports" ]; then
+  elif [ "${REMAP}" == "maxports" ]; then
     writeConfigKey "cmdline.SataPortMap" "${SATAPORTMAPMAX}" "${USER_CONFIG_FILE}"
     writeConfigKey "cmdline.DiskIdxMap" "${DISKIDXMAPMAX}" "${USER_CONFIG_FILE}"
     deleteConfigKey "cmdline.sata_remap" "${USER_CONFIG_FILE}"
     deleteConfigKey "cmdline.ahci_remap" "${USER_CONFIG_FILE}"
-  elif [ "${REMAP}" = "remap" ]; then
+  elif [ "${REMAP}" == "remap" ]; then
     writeConfigKey "cmdline.sata_remap" "${SATAREMAP}" "${USER_CONFIG_FILE}"
     deleteConfigKey "cmdline.DiskIdxMap" "${USER_CONFIG_FILE}"
     deleteConfigKey "cmdline.SataPortMap" "${USER_CONFIG_FILE}"
     deleteConfigKey "cmdline.ahci_remap" "${USER_CONFIG_FILE}"
-  elif [ "${REMAP}" = "ahci" ]; then
+  elif [ "${REMAP}" == "ahci" ]; then
     writeConfigKey "cmdline.ahci_remap" "${SATAREMAP}" "${USER_CONFIG_FILE}"
     deleteConfigKey "cmdline.DiskIdxMap" "${USER_CONFIG_FILE}"
     deleteConfigKey "cmdline.SataPortMap" "${USER_CONFIG_FILE}"
     deleteConfigKey "cmdline.sata_remap" "${USER_CONFIG_FILE}"
-  elif [ "${REMAP}" = "user" ]; then
+  elif [ "${REMAP}" == "user" ]; then
     deleteConfigKey "cmdline.SataPortMap" "${USER_CONFIG_FILE}"
     deleteConfigKey "cmdline.DiskIdxMap" "${USER_CONFIG_FILE}"
     deleteConfigKey "cmdline.sata_remap" "${USER_CONFIG_FILE}"
@@ -236,3 +236,5 @@ writeConfigKey "device.raidcontroller" "${RAIDCONTROLLER}" "${USER_CONFIG_FILE}"
 if [ ${RAIDCONTROLLER} -gt 0 ]; then
   writeConfigKey "device.externalcontroller" "true" "${USER_CONFIG_FILE}"
 fi
+# Check Controller for Disks
+getmap

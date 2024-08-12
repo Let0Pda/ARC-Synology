@@ -9,47 +9,42 @@
 . ${ARC_PATH}/include/modules.sh
 . ${ARC_PATH}/include/network.sh
 . ${ARC_PATH}/include/update.sh
+. ${ARC_PATH}/boot.sh
 
-[ -z "${LOADER_DISK}" ] && die "Loader Disk not found!"
+# Check for System
+systemCheck
 
-# Check for Hypervisor
-if grep -q "^flags.*hypervisor.*" /proc/cpuinfo; then
-  # Check for Hypervisor
-  MACHINE="$(lscpu | grep Hypervisor | awk '{print $3}')"
-else
-  MACHINE="NATIVE"
-fi
-
-# Get Loader Disk Bus
-BUS=$(getBus "${LOADER_DISK}")
+# Offline Mode check
+offlineCheck "false"
+ARCNIC="$(readConfigKey "arc.nic" "${USER_CONFIG_FILE}")"
+OFFLINE="$(readConfigKey "arc.offline" "${USER_CONFIG_FILE}")"
+AUTOMATED="$(readConfigKey "automated" "${USER_CONFIG_FILE}")"
 
 # Get DSM Data from Config
 MODEL="$(readConfigKey "model" "${USER_CONFIG_FILE}")"
 PRODUCTVER="$(readConfigKey "productver" "${USER_CONFIG_FILE}")"
-LAYOUT="$(readConfigKey "layout" "${USER_CONFIG_FILE}")"
-KEYMAP="$(readConfigKey "keymap" "${USER_CONFIG_FILE}")"
-LKM="$(readConfigKey "lkm" "${USER_CONFIG_FILE}")"
 if [ -n "${MODEL}" ]; then
   PLATFORM="$(readConfigKey "platform" "${USER_CONFIG_FILE}")"
   DT="$(readConfigKey "platforms.${PLATFORM}.dt" "${P_FILE}")"
 fi
 
-# Get Arc Data from Config
+# Get Config/Build Status
 CONFDONE="$(readConfigKey "arc.confdone" "${USER_CONFIG_FILE}")"
 BUILDDONE="$(readConfigKey "arc.builddone" "${USER_CONFIG_FILE}")"
-OFFLINE="$(readConfigKey "arc.offline" "${USER_CONFIG_FILE}")"
-CUSTOM="${readConfigKey "arc.custom" "${USER_CONFIG_FILE}"}"
+
+# Get Keymap and Timezone Config
+ntpCheck
 
 ###############################################################################
 # Mounts backtitle dynamically
 function backtitle() {
-  if [ ! -n "${MODEL}" ]; then
+  if [ -z "${MODEL}" ]; then
     MODEL="(Model)"
   fi
-  if [ ! -n "${PRODUCTVER}" ]; then
+  if [ -z "${PRODUCTVER}" ]; then
     PRODUCTVER="(Version)"
   fi
-  if [ ! -n "${IPCON}" ]; then
+  if [ -z "${IPCON}" ]; then
     IPCON="(IP)"
   fi
   BACKTITLE="${ARC_TITLE} | "
@@ -59,7 +54,8 @@ function backtitle() {
   BACKTITLE+="Patch: ${ARCPATCH} | "
   BACKTITLE+="Config: ${CONFDONE} | "
   BACKTITLE+="Build: ${BUILDDONE} | "
-  BACKTITLE+="${MACHINE}(${BUS})"
+  BACKTITLE+="${MACHINE}(${BUS}) | "
+  BACKTITLE+="KB: ${KEYMAP}"
   echo "${BACKTITLE}"
 }
 
@@ -69,18 +65,19 @@ function arcUpdate() {
   # Automatic Update
   updateLoader
   updateAddons
-  updateAddon
   updateConfigs
   updateLKMs
   updateModules
   updatePatches
+  updateCustom
   # Ask for Boot
   dialog --backtitle "$(backtitle)" --title "Update Loader" --aspect 18 \
-    --infobox "Update successfull!" 0 0
+    --infobox "Update successful!" 0 0
+  writeConfigKey "arc.key" "" "${USER_CONFIG_FILE}"
   writeConfigKey "arc.builddone" "false" "${USER_CONFIG_FILE}"
   BUILDDONE="$(readConfigKey "arc.builddone" "${USER_CONFIG_FILE}")"
-  if [ "${CUSTOM}" = "true" ] && [ ! -f "${PART3_PATH}/automated" ]; then
-    echo "${ARC_VERSION}-${MODEL}-{PRODUCTVER}-custom" >"${PART3_PATH}/automated"
+  if [ "${CONFDONE}" == "true" ] && [ ! -f "${PART3_PATH}/automated" ]; then
+    echo "${ARC_VERSION}-${MODEL}-${PRODUCTVER}-custom" >"${PART3_PATH}/automated"
   fi
   boot
 }
@@ -88,26 +85,28 @@ function arcUpdate() {
 ###############################################################################
 # Calls boot.sh to boot into DSM kernel/ramdisk
 function boot() {
-  if [ "${CUSTOM}" = "true" ]; then
+  CONFDONE="$(readConfigKey "arc.confdone" "${USER_CONFIG_FILE}")"
+  if [ "${CONFDONE}" == "true" ]; then
     dialog --backtitle "$(backtitle)" --title "Arc Boot" \
       --infobox "Rebooting to automated Build Mode...\nPlease stay patient!" 4 30
+    sleep 3
+    rebootTo automated
   else
     dialog --backtitle "$(backtitle)" --title "Arc Boot" \
       --infobox "Rebooting to Config Mode...\nPlease stay patient!" 4 30
+    sleep 3
+    rebootTo config
   fi
-  rm -f "${MOD_ZIMAGE_FILE}" "${MOD_RDGZ_FILE}" 2>/dev/null
-  sleep 3
-  exec reboot
 }
 
 ###############################################################################
 ###############################################################################
 # Main loop
-if [ "${OFFLINE}" = "false" ]; then
+if [ "${OFFLINE}" == "false" ]; then
   arcUpdate
 else
-  dialog --backtitle "$(backtitle)" --title "Upgrade Loader" --aspect 18 \
+  dialog --backtitle "$(backtitle)" --title "Update Loader" --aspect 18 \
     --infobox "Offline Mode enabled.\nCan't Update Loader!" 0 0
   sleep 5
-  exec reboot
+  bootDSM
 fi

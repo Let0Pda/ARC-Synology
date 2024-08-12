@@ -12,6 +12,8 @@ RAMDISK_PATH="${TMP_PATH}/ramdisk"
 LOG_FILE="${TMP_PATH}/log.txt"
 TMP_UP_PATH="${TMP_PATH}/upload"
 
+USER_GRUB_CONFIG="${PART1_PATH}/boot/grub/grub.cfg"
+USER_GRUBENVFILE="${PART1_PATH}/boot/grub/grubenv"
 USER_CONFIG_FILE="${PART1_PATH}/user-config.yml"
 GRUB_PATH="${PART1_PATH}/boot/grub"
 
@@ -27,7 +29,7 @@ ADDONS_PATH="${PART3_PATH}/addons"
 MODULES_PATH="${PART3_PATH}/modules"
 MODEL_CONFIG_PATH="${PART3_PATH}/configs"
 PATCH_PATH="${PART3_PATH}/patches"
-LKM_PATH="${PART3_PATH}/lkms"
+LKMS_PATH="${PART3_PATH}/lkms"
 CUSTOM_PATH="${PART3_PATH}/custom"
 USER_UP_PATH="${PART3_PATH}/users"
 
